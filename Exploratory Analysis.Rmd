@@ -1,0 +1,348 @@
+
+2. Descriptive analysis
+
+2.1. Check correlations
+
+```{r}
+library(corrplot)
+corrplot(cor(likehome.final[sapply(likehome.final, is.numeric)]),number.cex=0.7)
+```
+
+
+2.1. Exploratary Variables
+
+#Distribution of continous numeric variables: 
+```{r}
+
+x <- likehome.final$Price
+h1<-hist(x, breaks=10, col="red", xlab="Price Distribution",
+   main="Histogram with Normal Curve")
+xfit<-seq(min(x),max(x),length=40)
+yfit<-dnorm(xfit,mean=mean(x),sd=sd(x))
+yfit <- yfit*diff(h1$mids[1:2])*length(x)
+lines(xfit, yfit, col="blue", lwd=2)
+
+likehome.final.1 <- likehome.final%>%
+  mutate(Price =log(Price)) 
+
+x <- likehome.final.1$Price
+h2<-hist(x, breaks=10, col="red", xlab="Price Distribution",
+   main="Histogram with Normal Curve after Log Transformation")
+xfit<-seq(min(x),max(x),length=40)
+yfit<-dnorm(xfit,mean=mean(x),sd=sd(x))
+yfit <- yfit*diff(h2$mids[1:2])*length(x)
+lines(xfit, yfit, col="blue", lwd=2)
+
+```
+Price distribution is right-skewed. This means that we need to take the log value of Price to run the linear regression 
+
+2.2. Rental objects in five cities
+
+```{r}
+##Rearrange factors: City following Eeast -> West, Property following ascending order in quantity
+likehome.final$City <- factor(likehome.final$City,levels=c("Boston","New York City","Los Angeles","San Francisco","Seattle"))
+likehome.final$Property_type <- factor(likehome.final$Property_type,levels=
+c("Apartment","House","Condominium","Townhouse","Loft","Guesthouse","Bungalow","Villa","Serviced apartment"))
+
+
+##How are the prices different among cities?
+likehome.final %>%
+  filter(Property_type %in% c( "Apartment", "House", "Condominium", "Loft", "Townhouse" )) %>%
+  ggplot()+
+  geom_boxplot(aes(reorder(City,Price,FUN=median),Price,fill=Property_type))+
+  theme_minimal()+
+  theme(axis.text.x = element_text(face="bold",size=9))+
+  xlab("")+
+  ylab("")+
+  theme(legend.position="bottom")+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))
+
+## Room_type - Bed_type and Price
+
+likehome.final %>%
+  ggplot()+
+  geom_boxplot(aes(reorder(Bed_type,Price,FUN=median),Price,fill=Bed_type))+
+  theme_minimal()+
+  theme(axis.text.x = element_text(face="bold",size=9))+
+  xlab("")+
+  ylab("")+
+  theme(legend.position="none")
+  
+likehome.final %>%
+  filter(!Room_type=="Unknown") %>%
+  ggplot()+
+  geom_boxplot(aes(reorder(Room_type,Price,FUN=median),Price,fill=Room_type))+
+  theme_minimal()+
+  theme(axis.text.x = element_text(face="bold",size=9))+
+  xlab("")+
+  ylab("")+
+  theme(legend.position="none")
+
+##Dominant house types in each city - 5 most-rented property type
+
+likehome.final %>%
+  ggplot()+
+  geom_bar(aes(City,fill=Property_type),position="stack",color="black")+
+  theme_minimal()+
+  xlab("")+
+  ylab("")+
+  theme(axis.text.x = element_text(face="bold",size=9))+
+  theme(legend.position="bottom")
+
+##Dominant house types in each city - excluding Apartment and House
+likehome.final %>%
+  filter(!Property_type %in% c( "Apartment", "House" )) %>%
+  ggplot(aes(x=City, fill = Property_type))+
+  geom_bar(position = "stack", stat = "count",color='black',width=0.9) +
+  theme_minimal()+
+  xlab("")+
+  ylab("")+
+  theme(axis.text.x = element_text(face="bold",size=9))+
+  theme(legend.position="bottom")
+
+##Room_type breadown by cities
+
+percentData.room <- likehome.final %>% group_by(City) %>% count(Room_type) %>% 
+  mutate(ratio=round(n*100/sum(n),0))
+
+ggplot(percentData.room,aes(x=factor(City),y=ratio,fill=Room_type))+
+    geom_bar(position="fill",color="black",stat = "identity")+
+    geom_text(data=percentData.room, aes(y=n,label=paste0(ratio,"%")),position=position_fill(vjust=0.5))+
+  scale_y_continuous(labels = scales::percent)+
+  ylab("")+
+  xlab("")+
+  theme(axis.text.x = element_text(face="bold",size=9))+
+  theme(legend.position="bottom")
+
+```
+
+```{r}
+##Distributions of facilities across 5 cities
+ggplot(terizon.train, aes(x=Perc_Equipment, fill=Churn)) + geom_density(position = 'fill') 
+
+
+
++
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Wifi)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Aircon)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Heating)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Free_parking)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Workspace)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Tv)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Kitchen)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Washer)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Garden)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Waterfront)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Elevator)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Fireplace)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Doorman)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+ggplot(likehome.final, aes(x=Price, fill=Hot_tub)) + geom_density(position = 'fill') +
+  facet_wrap(~City)
+
+```
+
+2.3 Competitive Landscape 
+```{r}
+
+
+#Market Porfolio: Monthly Revenue and Key Locations
+
+#Quanity Sold: All market and across each property
+
+#Bar
+
+likehome.final %>%
+  ggplot()+
+  geom_bar(aes(x=Company,fill=Property_type),color="black",position = "stack",stat="count")+
+  xlab("")+
+  ylab("")+
+  theme(axis.text.x = element_text(face="bold",size=11))+
+  theme(legend.position="bottom")+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))
+
+#Stacked bar
+percentData.quant <- likehome.final %>% group_by(Property_type) %>% count(Company) %>% 
+  mutate(ratio=round(n*100/sum(n),0))
+
+ggplot(percentData.quant,aes(x=factor(Property_type),y=ratio,fill=Company))+
+    geom_bar(position="fill",color="black",stat = "identity")+
+    geom_text(data=percentData.quant, aes(y=ratio,label=paste0(ratio,"%")),position=position_fill(vjust=0.5))+
+    scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  scale_y_continuous(labels = scales::percent)+
+  ylab("")+
+  xlab("")+
+  theme(legend.position="bottom")+
+  theme(axis.text.x = element_text(face="bold",size=11,angle = 90))+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))
+
+
+##Monthly Revenue : Pie chart and Stacked bar
+
+#Pie chart
+
+percentData.rev <- likehome.final %>% 
+  group_by(Company) %>% 
+  summarise(Total = sum(Price, na.rm = TRUE)) %>%
+  mutate(ratio=round(Total*100/sum(Total),0))
+
+
+ggplot(percentData.rev, aes(x = "", y = ratio, fill = Company)) +
+  geom_bar(width = 1, stat = "identity", color = "black") +
+  coord_polar("y", start = 0)+
+  geom_text(aes(y = ratio, label = paste0(ratio,"%")), color = "black", position = position_stack(vjust = 0.5))+
+  scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  ylab("")+
+  xlab("")+
+  theme_void()
+
+#Stack Bar
+
+percentData.rev.2 <- likehome.final %>% group_by(Property_type,Company) %>% 
+  summarise(Total = sum(Price, na.rm = TRUE)) %>%
+  mutate(ratio=round(Total*100/sum(Total),0))
+
+ggplot(percentData.rev.2,aes(x=factor(Property_type),y=ratio,fill=Company))+
+    geom_bar(position="fill",color="black",stat = "identity")+
+    geom_text(data=percentData.rev.2, aes(y=ratio,label=paste0(ratio,"%")),position=position_fill(vjust=0.5))+
+    scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  scale_y_continuous(labels = scales::percent)+
+  ylab("")+
+  xlab("")+
+  theme(legend.position="bottom")+
+  theme(axis.text.x = element_text(face="bold",size=11,angle = 90))+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))+
+   theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))
+
+
+#Price distributions of 3 companies
+library(ggridges)
+ggplot(likehome.final, aes(x = Price, y = Company)) +
+  geom_density_ridges(aes(fill = Company)) +
+  scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  xlab("")+
+  ylab("")+
+  theme(legend.position="bottom")+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))
+
+
+ggplot(likehome.final, aes(x = Property_type, y = Price, fill=Company)) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  xlab("")+
+  ylab("")+
+  theme(axis.text.x = element_text(face="bold",size=11,angle = 90))+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))
+
+
+#Room_type different among three companies
+ theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))
+
+percentData.room <- likehome.final %>% group_by(Company) %>% count(Room_type) %>% 
+  mutate(ratio=round(n*100/sum(n),0))
+
+ggplot(percentData.room,aes(x=factor(Company),y=ratio,fill=Room_type))+
+    geom_bar(position="fill",color="black",stat = "identity")+
+    geom_text(data=percentData.room, aes(y=ratio,label=paste0(ratio,"%")),position=position_fill(vjust=0.5))+
+    scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  scale_y_continuous(labels = scales::percent)+
+  ylab("")+
+  xlab("")+
+  theme(legend.position="bottom")+
+  theme(axis.text.x = element_text(face="bold",size=11,angle = 90))+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))
+
+#Price distributions of Room_type
+
+likehome.final %>% filter(!Room_type=="Unknown") %>%
+ggplot(aes(x = Room_type, y = Price, fill=Company)) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("#00AFBB", "#E7B800", "#FC4E07"))+
+  xlab("")+
+  ylab("")+
+  theme(axis.text.x = element_text(face="bold",size=11,angle = 90))+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))
+
+```
+
+```{r}
+ggplot(likehome.final, aes(x=Price, fill=Pets)) + geom_density(position = 'fill') +
+  facet_wrap(~Company)
+ggplot(likehome.final, aes(x=Price, fill=Wifi)) + geom_density(position = 'fill') +
+  facet_wrap(~Company)
+ggplot(likehome.final, aes(x=Price, fill=Aircon)) + geom_density(position = 'fill') +
+  facet_wrap(~Company)
+ggplot(likehome.final, aes(x=Price, fill=Heating)) + geom_density(position = 'fill') +
+  facet_wrap(~Company)
+ggplot(likehome.final, aes(x=Price, fill=Free_parking)) + geom_density(position = 'fill') +
+  facet_wrap(~Company)
+ggplot(likehome.final, aes(x=Price, fill=Workspace)) + geom_density(position = 'fill') +
+  facet_wrap(~Company)
+
+```
+
+Product Porfolio of 3 companies
+
+```{r}
+
+#2nd Address
+percentData.company <- likehome.final %>% filter(!Property_type %in% c("Apartment", "House", "Condominium")) %>%
+  group_by(Company, City) %>% count(Property_type) %>% 
+  mutate(ratio=round(n*100/sum(n),0))
+
+
+p1 <- percentData.company %>% filter(Company=="2nd Address") %>%
+ggplot(aes(x=City,y=ratio,fill=Property_type))+
+    geom_bar(position="fill",color="black",stat = "identity")+
+  ylab("")+
+  xlab("")+
+  theme(legend.position="bottom")+
+  theme(axis.text.x = element_text(face="bold",size=11,angle = 90))+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))
+
+p2 <- percentData.company %>% filter(Company=="LikeHome") %>%
+ggplot(aes(x=City,y=ratio,fill=Property_type))+
+    geom_bar(position="fill",color="black",stat = "identity")+
+  ylab("")+
+  xlab("")+
+  theme(legend.position="bottom")+
+  theme(axis.text.x = element_text(face="bold",size=11,angle = 90))+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))
+
+p3 <- percentData.company %>% filter(Company=="Common") %>%
+ggplot(aes(x=City,y=ratio,fill=Property_type))+
+    geom_bar(position="fill",color="black",stat = "identity")+
+  ylab("")+
+  xlab("")+
+  theme(legend.position="bottom")+
+  theme(axis.text.x = element_text(face="bold",size=11,angle = 90))+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))
+
+ggarrange(p1, p2, p3, ncol = 3, common.legend = TRUE) 
+```

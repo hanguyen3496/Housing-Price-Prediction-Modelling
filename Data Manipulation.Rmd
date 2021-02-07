@@ -1,0 +1,163 @@
+```{r}
+1. Data cleaning:
+
+1.1. Check missing values and colume that contains most of missing value: 9728 obs out of 39344 obs contains NA, which means that nearly 25% obs would be obmitted due to NA. In order to retain sufficient obs to ensure the insights extracting from dataset, data imputatation will be conducted on variables that have lots of NA observation: Review_scores_rating, Room_type and Zipcode
+```{r}
+#Load data and package
+getwd
+setwd("C:/Users/Ha Nguyen/Desktop/Study Courses/Quarter 4/The Analytics Edge/Individual Assignment")
+
+likehome <- read.csv2("LikeHome_GroupA (1).csv")
+
+glimpse(likehome)
+view(likehome)
+
+#Mutate variables to factor
+likehome <- likehome %>%
+  mutate(Wifi =as.factor(Wifi),
+         Aircon =as.factor(Aircon),
+         Heating =as.factor(Heating),
+         Free_parking =as.factor(Free_parking),
+         Workspace =as.factor(Workspace),
+         Tv =as.factor(Tv),
+         Kitchen =as.factor(Kitchen),
+         Washer =as.factor(Washer),
+         Garden =as.factor(Garden),
+         Waterfront =as.factor(Waterfront),
+         Elevator =as.factor(Elevator),
+         Fireplace =as.factor(Fireplace),
+         Doorman =as.factor(Doorman),
+         Balcony =as.factor(Balcony),
+         Hot_tub =as.factor(Hot_tub),
+         Pets =as.factor(Pets))
+
+#Check vars with missing values
+contains.missing <- likehome %>%
+  filter_all(any_vars(is.na(.))) %>%
+  select_if(function(x) any(is.na(x)))
+
+contains.missing
+view(contains.missing)
+
+
+
+```
+
+1.2. Data imputatation:
+
+##Review_scores_rating: Imputate Review_score_rating by adding median value
+```{r}
+likehome <- likehome %>%
+   mutate(Review.missing = as.factor(ifelse(is.na(Review_scores_rating), 1, 0)),
+         Review_scores_rating = ifelse(is.na(Review_scores_rating),
+                                      median(Review_scores_rating, na.rm = T),
+                                      Review_scores_rating)) 
+```
+
+##Bathroom and Bedroom: Imputation by adding median value
+```{r}
+likehome <- likehome %>%
+   mutate(Bathrooms.missing = as.factor(ifelse(is.na(Bathrooms), 1, 0)),
+         Bathrooms = ifelse(is.na(Bathrooms), median(Bathrooms, na.rm = T), Bathrooms),
+         Bedrooms.missing =  as.factor(ifelse(is.na(Bedrooms), 1, 0)),
+         Bedrooms = ifelse(is.na(Bedrooms),median(Bedrooms, na.rm = T),Bedrooms))
+
+```
+
+#Zipcode, Room_type and City: Imputate NA as "Unknown"
+```{r}
+likehome <- likehome %>%
+  mutate(Zipcode.missing = as.factor(ifelse(is.na(Zipcode), 1, 0)),
+        Zipcode= ifelse(is.na(Zipcode),"Unknown",as.character(Zipcode)))
+
+likehome <- likehome %>%
+  mutate(Room_type.missing = as.factor(ifelse(is.na(Room_type), 1, 0)),
+        Room_type= ifelse(is.na(Room_type),"Unknown",as.character(Room_type))) %>%
+  mutate(Room_type=as.factor(Room_type))
+
+likehome <- likehome %>%
+  mutate(City.missing = as.factor(ifelse(is.na(City), 1, 0)),
+        City= ifelse(is.na(City),"Unknown",as.character(City)))
+
+```
+
+#Fixing 5 Cities value: Boston and Los Angeles are messed up with mutiple entries referring the same city. As each city will have a unique identity in Zipcode range, we will use Zipcode as proxy to assign value back to these five cities
+
+```{r}
+
+likehome <- likehome %>%
+  mutate(Zipcode = substr(Zipcode,1,5))
+
+likehome <- likehome %>%
+  mutate(Zipcode=as.integer(Zipcode)) 
+
+likehome <- likehome %>%
+  mutate(City = ifelse(Zipcode %in% (90000:93551),"Los Angeles",
+                       ifelse(Zipcode %in% (10000:11695),"New York City",
+                              ifelse(Zipcode %in% (94014:95202),"San Francisco",
+                                     ifelse(Zipcode %in% (98101:98177),"Seattle",
+                                            if_else(Zipcode %in% (2000:2467),"Boston",as.character(City)))))))
+
+likehome <- likehome %>%
+  mutate(Zipcode= if_else(is.na(Zipcode),"Unknown",as.character(Zipcode)))
+
+unique(likehome$City)
+```
+
+The remaining City value except 5 cities are values that can not be assigned based on Zipcode because these ciies have "Unknown" Zipcode value. we will omit these cities and leave only 5 cities in the final data.
+
+
+1.2. Invalid variables and observations: variables that contains only one-side argument will not have any impact on the analysis for difference among obs, therefore will be excluded. 
+
+Futhermore, there are some obs that have numbers of beds is 0 but still have Bed_type, this will be considered as invalid data and thus also be excluded.
+
+```{r}
+##Vars that contains only one side argument 
+
+contains.zero <- likehome %>%
+  select_if(function(x) all(x==0) | all(x==1))
+
+##filter only one-side argument
+likehome <- likehome %>%
+  select(!Balcony)
+
+##Filter out rooms with no.of beds equals zero
+
+unique(likehome$Bed_type)
+
+likehome <- likehome %>%
+  filter(!Beds==0)
+```
+
+
+1.3. Final data and final missing data
+
+The final data include observations for five cities: Boston, Los Angeles, New York City, Seattle and San Francisco and will be filter out with all missing value.
+So after the data imputation, we have included back lots of data points, reducing the omiited obs from 9728 to only 154 
+
+```{r}
+#Check vars with missing values after imputation
+contains.missing.final <- likehome %>%
+  filter_all(any_vars(is.na(.))) %>%
+  select_if(function(x) any(is.na(x)))
+
+#Final data for analysis: include Region 
+likehome.final <- likehome %>%
+  filter_all(all_vars(!is.na(.)))
+
+likehome.final <- likehome.final %>%
+  filter(City %in% c("Boston", "Los Angeles", "New York City", "Seattle","San Francisco")) %>%
+mutate(City =  as.factor(City),
+       Region=as.factor(if_else(City %in% c("New York City", "Boston"),"East Coast","West Coast")))
+
+
+glimpse(likehome.final)
+
+likehome.final %>% summary()
+
+write.csv(likehome.final,"C:\\Users\\Ha Nguyen\\Desktop\\MyData.Likehome.csv", row.names = FALSE)
+
+```
+
+```
+

@@ -1,0 +1,278 @@
+---
+title: "Individual Assignment"
+output: html_document
+---
+```{r}
+#tinytex::install_tinytex()
+```
+```{r}
+
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(ggpubr)
+
+```
+
+
+
+
+3. Price prediction
+
+3.1. Simple linear regression
+```{r}
+
+#install.packages("future")
+library(future)
+plan(multiprocess, workers = 4)
+
+require(caret)
+require(ggfortify)
+
+## Eliminate multicollinarity effect : Keeping Region and Country will lead to the multicollinariy effect
+
+likehome.final <- likehome.final %>%
+  select(!c(Region,Country))
+
+train.control <- trainControl(method = "repeatedcv",
+                              repeats = 10,
+                              number = 10,
+                              verboseIter = F)
+
+
+#Simple linear regression
+
+set.seed(2)
+
+simple.linear.regression <- train(log(Price) ~. -ID -Zipcode -Review.missing -Bathrooms.missing -Bedrooms.missing -Zipcode.missing -Room_type.missing -City.missing,
+                                  data = likehome.final,
+                                  method = "lm",
+                                  metric = "Rsquared",
+                                  trControl = train.control)
+
+autoplot(simple.linear.regression$finalModel, which = 1:4, ncol = 2, label.size = 3) +
+  theme_minimal()
+
+summary(simple.linear.regression)
+
+```
+
+Data exploraion 
+
+Variable Important 
+```{r}
+importance <- varImp(simple.linear.regression, scale=FALSE)
+
+plot(importance, top=10)
+
+
+```
+
+
+```{r}
+data.clean <- likehome.final %>%
+  slice(c(20237,25924,29914))
+
+likehome.final %>% filter(City=="New York City") %>%
+  ggplot(aes(x=Property_type,y=Price,fill=Property_type)) + 
+  geom_boxplot(alpha=0.3) +
+  geom_point(data=data.clean, aes(x=Property_type,y=Price), color='red',size=3)+
+  theme(legend.position="none")+
+  theme(axis.text.x = element_text(face="bold",size=11,angle = 90))+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))+
+  xlab("")
+  
+
+likehome.final %>% filter(City=="New York City") %>%
+  ggplot(aes(x=Room_type,y=Price,fill=Room_type)) + 
+  geom_boxplot(alpha=0.3) +
+  geom_point(data=data.clean, aes(x=Room_type,y=Price), color='red',size=3)+
+  theme(legend.position="none")+
+  theme(axis.text.x = element_text(face="bold",size=11,angle = 90))+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))+
+  xlab("")
+
+likehome.final %>% filter(City=="New York City") %>%
+  filter(Neighbourhood %in% c("Bayside","Brownsville","Mott Haven")) %>%
+  ggplot(aes(x=Neighbourhood,y=Price,fill=Neighbourhood)) + 
+  geom_boxplot(alpha=0.3) +
+  geom_point(data=data.clean, aes(x=Neighbourhood,y=Price), color='red',size=3)+
+  theme(legend.position="none")+
+  theme(axis.text.x = element_text(face="bold",size=11,angle = 90))+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))+
+  xlab("")
+
+likehome.final %>% filter(City=="New York City") %>%
+  ggplot()+
+  geom_jitter(aes(Review_scores_rating,Price))+
+  geom_point(data=data.clean, aes(x=Review_scores_rating,y=Price), color='red',size=3)+
+  theme(legend.position="none")+
+  theme(axis.text.x = element_text(face="bold",size=11,angle = 90))+
+  theme(panel.background = element_blank())+
+  theme(axis.line = element_line(colour = "black"))+
+  xlab("")
+
+
+
+```
+All of other predictors seem to be in a reasonable range, except for Review_Scores_rating showing that it is not original data but imputation. The median in rating might not truly reflect the value of these properties.
+
+3.2. Stepwise Regression
+
+```{r}
+
+et.seed(2)
+
+stepwise.linear.regression <- train(log(Price) ~. -ID -Zipcode -Review.missing -Bathrooms.missing -Bedrooms.missing -Zipcode.missing -Room_type.missing -City.missing,
+                                    data = likehome.final,
+                                    method = "glmStepAIC",
+                                    direction= "backward",
+                                    metric = "Rsquared",
+                                    steps=0,
+                                    trControl = train.control,
+                                    trace = 0)
+
+
+summary(stepwise.linear.regression)set.seed(2)
+
+stepwise.linear.regression <- train(log(Price) ~. -ID -Zipcode -Review.missing -Bathrooms.missing -Bedrooms.missing -Zipcode.missing -Room_type.missing -City.missing,
+                                    data = likehome.final,
+                                    method = "glmStepAIC",
+                                    direction= "backward",
+                                    metric = "Rsquared",
+                                    steps=0,
+                                    trControl = train.control,
+                                    trace = 0)
+
+
+summary(stepwise.linear.regression)
+formula(stepwise.linear.regression)
+```
+
+
+3.3. Lasso and Ridge Regression
+
+```{r}
+
+##Lasso Regression
+
+set.seed(2)
+
+tuning.grid <- expand.grid(lambda = 10^seq(2, -2, length = 100),
+                           alpha = 1)
+
+lasso.linear.regression <- train(log(Price) ~ .-ID -Zipcode -Review.missing -Bathrooms.missing -Bedrooms.missing -Zipcode.missing -Room_type.missing -City.missing,
+                                 data = likehome.final,
+                                 method = "glmnet",
+                                 metric = "Rsquared",
+                                 trControl = train.control,
+                                 tuneGrid = tuning.grid)
+
+coef(lasso.linear.regression$finalModel, lasso.linear.regression$bestTune$lambda)
+
+
+#Ridge Regression
+
+set.seed(2)
+
+tuning.grid <- expand.grid(lambda = 10^seq(2, -2, length = 100),
+                           alpha = 0)
+
+ridge.linear.regression <- train(log(Price) ~ .-ID -Zipcode -Review.missing -Bathrooms.missing -Bedrooms.missing -Zipcode.missing -Room_type.missing -City.missing,
+                                 data = likehome.final,
+                                 method = "glmnet",
+                                 metric = "Rsquared",
+                                 trControl = train.control,
+                                 tuneGrid = tuning.grid)
+
+coef(ridge.linear.regression$finalModel, ridge.linear.regression$bestTune$lambda)
+
+#Var Importance 
+
+importance.2 <- varImp(lasso.linear.regression, scale=FALSE)
+
+plot(importance.2, top=10)
+
+importance.3 <- varImp(ridge.linear.regression, scale=FALSE)
+
+plot(importance.3, top=10)
+
+
+
+```
+
+#Model Comparison
+
+```{r}
+resamps <- resamples(list(lm = simple.linear.regression,
+                         lasso = lasso.linear.regression,
+                         stepwise = stepwise.linear.regression,
+                          ridge = ridge.linear.regression))
+
+summary(resamps)
+bwplot(resamps, layout = c(3, 1)) 
+```
+
+4.Check whether prices are competitive
+
+```{r}
+
+#Plot Price and Predicted Price of all observations 
+
+likehome.final <- likehome.final %>%
+  mutate(Predicted = predict(simple.linear.regression)) %>%
+  mutate(Predicted=exp(Predicted)) %>%
+  mutate(Residual=Price-Predicted)
+
+likehome.final %>%
+  ggplot()+
+  geom_point(aes(Predicted,Price))+
+  geom_smooth(mapping = aes(x = Predicted, y = Price),
+              method = "lm", se = F) +
+  theme_minimal()
+
+#Plot Price and Predicted Price of ID 316332, 103303,652435
+
+likehome.final.check <- likehome.final %>%
+  filter(ID %in% c(316332, 103303,652435)) %>%
+  mutate(Assessment = if_else(Price > Predicted, "Overpriced","Underpriced"))
+
+
+likehome.final.check %>%
+  ggplot(aes(Predicted,Price))+
+  geom_point()+
+  geom_smooth(mapping = aes(x = Predicted, y = Price),
+              method = "lm", se = F) +
+   theme_minimal()
+
+#Check Price of other competitors that offer property that has same feature to 652435, since this property has price that lower than predicted but cannot be explained through investigation with predictors
+
+likehome.final.1 <- likehome.final %>% filter(City=="Seattle" & Neighbourhood=="Minor" & Property_type=="Apartment" & Room_type=="Entire home/apt")
+
+likehome.final.1 %>%
+  ggplot()+
+  geom_point(aes(Predicted,Price,color=Company))+
+  geom_smooth(mapping = aes(x = Predicted, y = Price),
+              method = "lm", se = F) +
+   theme_minimal()
+
+
+```
+
+Further Analysis 
+
+There is some price cluster that do not follow the linear regression: it seems that there is some underlying interactions between variables that their joint presence can strongly influence the price regardless of other elements
+
+```{r}
+likehome.final.analysis <- likehome.final %>%
+  filter(Price %in% c(7200,8100,10800))
+```
+
+After analysis these price cluster, all the properties have the same common characteristics in Real Bed and Entire Home 
+
